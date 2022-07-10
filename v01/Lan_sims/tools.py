@@ -26,7 +26,7 @@ def force(x, amatrix, pot_edges, start_bins, width_bins):
 
 
 @njit()
-def integrate_LE(
+def Runge_Kutta_integrator(
     nsteps, dt, m, gammas, tgammas, L, x0, v, R, kT, pot_edges, amatrix
 ):
     """
