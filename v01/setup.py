@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 if __name__ == "__main__":
     # cihan langevin
-    setup(name='Langevin_sims',
+    setup(name='Lan_sims',
           packages=find_packages(),
           version="1.0",
           license='MIT',
