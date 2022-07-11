@@ -1,5 +1,6 @@
 import numpy as np
 from numba import njit
+from math import sqrt
 
 
 @njit
@@ -14,7 +15,7 @@ def force(x, amatrix, pot_edges, start_bins, width_bins):
     # the first bin and floor dividing
     idx = int((x - start_bins) // width_bins)
     idx = max(idx, 0)
-    idx = min(idx, len(pot_edges) - 1)
+    idx = min(idx, len(pot_edges) - 2)
 
     # evaluate the gradient of the spline rep
     output = -(
@@ -24,11 +25,20 @@ def force(x, amatrix, pot_edges, start_bins, width_bins):
     )
     return output
 
+@njit
+def coupling_force(x, y, coupling_k):
+    return - coupling_k * (x - y)
+
+@njit
+def do_RK_step_for_y(dt, gammas, couplings, initials):
+    number_of_ys = len(couplings)
+    for n in range(number_of_ys):
+
+
 
 @njit()
 def Runge_Kutta_integrator(
-    nsteps, dt, m, gammas, tgammas, L, x0, v, R, kT, pot_edges, amatrix
-):
+    nsteps, dt, m, gammas, couplings, initials, pot_edges, amatrix, kT=2.494):
     """
     Integrator for a Markovian Embedding with exponentially
     decaying memory kernels, characterized by friction gamma[i]
@@ -38,13 +48,8 @@ def Runge_Kutta_integrator(
     """
 
     # relevant constants
-    nr_exps = len(gammas)
-    gamma = gammas.sum()
-    td = L ** 2 * gamma / kT
-    tm = m / (gamma * td)
-    g = gammas / gamma
-    xi_sigma = np.sqrt(2 * g)
-    tg = tgammas / td
+    n = len(gammas) - 1
+    xi_sigma = np.sqrt(2 * kT * gamma)
     xi_factor = np.sqrt(1 / dt)
 
     # arrays to store temp data
@@ -53,11 +58,10 @@ def Runge_Kutta_integrator(
     Rtemp = np.zeros(nr_exps)
     # trajectory array
     x = np.zeros(nsteps)
-    current_pos_x = x0 / L
+    current_pos_x = x0
 
     # parameters for spline
-    pot_edges = np.copy(pot_edges / L)
-    width_bins = np.mean(pot_edges[1:] - pot_edges[:-1])
+    width_bins = pot_edges[1] - pot_edges[0]
     start_bins = pot_edges[0]
 
     for step in range(nsteps):
