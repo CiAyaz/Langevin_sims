@@ -2,6 +2,9 @@ import numpy as np
 from numba import njit
 from math import sqrt
 
+from pyrsistent import v
+from regex import V0
+
 
 @njit
 def force(x, amatrix, pot_edges, start_bins, width_bins):
@@ -29,15 +32,8 @@ def force(x, amatrix, pot_edges, start_bins, width_bins):
 def coupling_force(x, y, coupling_k):
     return - coupling_k * (x - y)
 
-@njit
-def do_RK_step_for_y(dt, gammas, couplings, initials):
-    number_of_ys = len(couplings)
-    for n in range(number_of_ys):
-
-
-
 @njit()
-def Runge_Kutta_integrator(
+def Runge_Kutta_integrator_GLE(
     nsteps, dt, m, gammas, couplings, initials, pot_edges, amatrix, kT=2.494):
     """
     Integrator for a Markovian Embedding with exponentially
@@ -48,88 +44,60 @@ def Runge_Kutta_integrator(
     """
 
     # relevant constants
-    n = len(gammas) - 1
-    xi_sigma = np.sqrt(2 * kT * gamma)
-    xi_factor = np.sqrt(1 / dt)
+    number_vars = len(gammas)
+    xi_factor = np.zeros(number_vars)
+    xi = np.zeros(number_vars)
+    xi_factor[1] = sqrt(2 * kT * gammas[1] / dt)
+    for y in range(2, number_vars):
+        xi_factor[y] = sqrt(2 * kT / gammas[y] / dt)
+    
+    # runge kutta step factors
+    RK = np.array([0.5, 0.5, 1.])
 
     # arrays to store temp data
-    xi = np.zeros(nr_exps)
-    kR = np.zeros((nr_exps, 4))
-    Rtemp = np.zeros(nr_exps)
+    vars = np.zeros((4, number_vars))
+    vars[0] = initials
+    k = np.zeros((4, number_vars))
+    
     # trajectory array
     x = np.zeros(nsteps)
-    current_pos_x = x0
 
     # parameters for spline
     width_bins = pot_edges[1] - pot_edges[0]
     start_bins = pot_edges[0]
 
     for step in range(nsteps):
-        # first runge kutta step
+        # draw random force
+        xi[1:] = np.random.normal(0., 1., number_vars - 1)
+        # first 3 runge kutta steps
+        for rk in range(3):
+            k[rk, 0] = vars[rk, 0]
+            k[rk, 1] = (force(vars[rk, 0], amatrix, pot_edges, start_bins, width_bins)
+            - gammas[1] * vars[rk, 1] + xi_factor[1] * xi[1]) / m
+            # orhtogonal degrees of freedom
+            for y in range(2, number_vars):
+                k[rk, 1] += coupling_force(vars[rk, 0], vars[rk, y], couplings[y - 2]) / m
+                k[rk, y] = (coupling_force(vars[rk, y], vars[rk, 0], couplings[y - 2]) / gammas[y]
+                + xi_factor[y]*xi[y])
+                vars[rk + 1, y] = vars[0, y] + RK[rk] * dt * k[rk, y]
+            # variable of interest
+            vars[rk + 1, 0] = vars[0, 0] + RK[rk] * dt * k[rk, 0]
+            vars[rk + 1, 1] = vars[0, 1] + RK[rk] * dt * k[rk, 1]
+
+        # last runge kutta step
+        k[3, 0] = vars[3, 0]
+        k[3, 1] = (force(vars[3, 0], amatrix, pot_edges, start_bins, width_bins)
+        - gammas[1] * vars[3, 1] + xi_factor[1] * xi[1]) / m
         # orhtogonal degrees of freedom
-        Rsum = 0
-        for i in range(nr_exps):
-            xi[i] = xi_factor * np.random.normal(loc=0.0, scale=xi_sigma[i])
-            Rsum += g[i] * (R[i] - current_pos_x) / tg[i]
+        for y in range(2, number_vars):
+            k[3, 1] += coupling_force(vars[3, 0], vars[3, y], couplings[y - 2]) / m
+            k[3, y] = (coupling_force(vars[3, y], vars[3, 0], couplings[y - 2]) / gammas[y]
+            + xi_factor[y]*xi[y])
+            vars[0, y] += dt * (k[0, y] + 0.5 * k[1, y] + 0.5 * k[2, y] + k[3, y]) / 6
         # variable of interest
-        kx1 = dt * v
-        kv1 = (
-            dt
-            / tm
-            * (Rsum + force(current_pos_x, amatrix, pot_edges, start_bins, width_bins))
-        )
+        vars[0, 0] += dt * (k[0, 0] + 0.5 * k[1, 0] + 0.5 * k[2, 0] + k[3, 0]) / 6
+        vars[0, 1] += dt * (k[0, 1] + 0.5 * k[1, 1] + 0.5 * k[2, 1] + k[3, 1]) / 6
 
-        for i in range(nr_exps):
-            kR[i, 0] = -dt * ((R[i] - current_pos_x) / tg[i] - xi[i] / g[i])
-            Rtemp[i] = R[i] + kR[i, 0] / 2
-        x1 = current_pos_x + kx1 / 2
-        v1 = v + kv1 / 2
+        x[step] = vars[0, 0]
 
-        # second runge kutta step
-        Rsum = 0
-        for i in range(nr_exps):
-            Rsum += g[i] * (Rtemp[i] - x1) / tg[i]
-        kx2 = dt * v1
-        kv2 = dt / tm * (Rsum + force(x1, amatrix, pot_edges, start_bins, width_bins))
-
-        for i in range(nr_exps):
-            kR[i, 1] = -dt * ((Rtemp[i] - x1) / tg[i] - xi[i] / g[i])
-            Rtemp[i] = R[i] + kR[i, 1] / 2
-        x2 = current_pos_x + kx2 / 2
-        v2 = v + kv2 / 2
-
-        # third kutta step
-        Rsum = 0
-        for i in range(nr_exps):
-            Rsum += g[i] * (Rtemp[i] - x2) / tg[i]
-        kx3 = dt * v2
-        kv3 = dt / tm * (Rsum + force(x2, amatrix, pot_edges, start_bins, width_bins))
-
-        for i in range(nr_exps):
-            kR[i, 2] = -dt * ((Rtemp[i] - x2) / tg[i] - xi[i] / g[i])
-            Rtemp[i] = R[i] + kR[i, 2]
-        x3 = current_pos_x + kx3
-        v3 = v + kv3
-
-        # fourth runge kutta step
-        Rsum = 0
-        for i in range(nr_exps):
-            Rsum += g[i] * (Rtemp[i] - x3) / tg[i]
-        kx4 = dt * v3
-        kv4 = dt / tm * (Rsum + force(x3, amatrix, pot_edges, start_bins, width_bins))
-
-        for i in range(nr_exps):
-            kR[i, 3] = -dt * ((Rtemp[i] - x3) / tg[i] - xi[i] / g[i])
-            Rtemp[i] = R[i] + kR[i, 3]
-
-        # join all steps
-        current_pos_x += (kx1 + 2 * kx2 + 2 * kx3 + kx4) / 6
-        v += (kv1 + 2 * kv2 + 2 * kv3 + kv4) / 6
-
-        # update data arrays
-        for i in range(nr_exps):
-            R[i] += (kR[i, 0] + 2 * kR[i, 1] + 2 * kR[i, 2] + kR[i, 3]) / 6
-        x[step] = current_pos_x
-
-    final = np.array([x[-1] * L, v])
-    return x * L, final, R
+    return x, vars[0]
