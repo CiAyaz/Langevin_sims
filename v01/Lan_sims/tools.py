@@ -101,3 +101,51 @@ def Runge_Kutta_integrator_GLE(
         x[step] = vars[0, 0]
 
     return x, vars[0]
+
+
+@njit()
+def Runge_Kutta_integrator_LE(
+    nsteps, dt, m, gamma, initials, pot_edges, amatrix, kT=2.494):
+    """
+    Integrator for a single particle underdamped Langevin eq.
+    """
+
+    # relevant constants
+    xi_factor = sqrt(2 * kT * gamma / dt)
+    
+    # runge kutta step factors
+    RK = np.array([0.5, 0.5, 1.])
+
+    # arrays to store temp data
+    vars = np.zeros((4, 2))
+    vars[0] = initials
+    k = np.zeros((4, 2))
+    
+    # trajectory array
+    x = np.zeros(nsteps)
+
+    # parameters for spline
+    width_bins = pot_edges[1] - pot_edges[0]
+    start_bins = pot_edges[0]
+
+    for step in range(nsteps):
+        # draw random force
+        xi = np.random.normal(0., 1.)
+        # first 3 runge kutta steps
+        for rk in range(3):
+            k[rk, 0] = vars[rk, 0]
+            k[rk, 1] = (force(vars[rk, 0], amatrix, pot_edges, start_bins, width_bins)
+            - gamma * vars[rk, 1] + xi_factor * xi) / m
+            vars[rk + 1, 0] = vars[0, 0] + RK[rk] * dt * k[rk, 0]
+            vars[rk + 1, 1] = vars[0, 1] + RK[rk] * dt * k[rk, 1]
+
+        # last runge kutta step
+        k[3, 0] = vars[3, 0]
+        k[3, 1] = (force(vars[3, 0], amatrix, pot_edges, start_bins, width_bins)
+        - gamma * vars[3, 1] + xi_factor * xi) / m
+        vars[0, 0] += dt * (k[0, 0] + 0.5 * k[1, 0] + 0.5 * k[2, 0] + k[3, 0]) / 6
+        vars[0, 1] += dt * (k[0, 1] + 0.5 * k[1, 1] + 0.5 * k[2, 1] + k[3, 1]) / 6
+
+        x[step] = vars[0, 0]
+
+    return x, vars[0]
