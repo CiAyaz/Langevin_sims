@@ -1,7 +1,9 @@
+from cProfile import label
 from typing import Type
 import numpy as np
 from scipy.interpolate import CubicSpline
 from sympy import ShapeError
+import matplotlib.pyplot as plt
 from Lan_sims.tools import *
 
 
@@ -22,7 +24,10 @@ class Lan_integrator():
         nbins = 80,
         hist_range = None,
         single_particle = True,
-        kT = 2.494
+        kT = 2.494,
+        plot=True,
+        save=False,
+        path_to_save='./'
         ):
         self.dt = dt
         self.segment_len = segment_length
@@ -36,7 +41,7 @@ class Lan_integrator():
         else:
             self.fe = free_energy[:,1]
             self.edges = free_energy[:,0]
-        if not self.single_particle and self.segment_len > 1:
+        if self.number_segments > 1:
             if hist_range != None:
                 self.hist_range = hist_range
             else:
@@ -49,6 +54,13 @@ class Lan_integrator():
         self.kT=kT
         self.x = None
         self.histogram = np.zeros(self.nbins)
+        self.sim_edges = None
+        self.fe_pos = None
+        self.fe_sim = None
+        self.fe_max = None
+        self.plot = plot
+        self.save = save
+        self.path_to_save = path_to_save
 
     def parse_input(self):
         if not self.single_particle:
@@ -102,17 +114,26 @@ class Lan_integrator():
         self.amat = cs.c.T
 
     def compute_distribution(self):
-        if self.single_particle:
+        if self.number_segments == 1:
             self.histogram, self.sim_edges = np.histogram(self.x, bins=self.nbins)
         else:
             hist_dummy, self.sim_edges = np.histogram(self.x, bins=self.nbins, range=self.hist_range)
             self.histogram += hist_dummy
 
     def compute_free_energy(self):
-        self.fe_pos =(self.sim_edges[1:] + self.sim_edges[:]) / 2
+        self.fe_pos =(self.sim_edges[1:] + self.sim_edges[:-1]) / 2
         self.fe_sim = -self.kT * np.log(self.histogram)
         self.fe_sim -= np.min(self.fe_sim)
-        
+        self.fe_max = 3
+
+    def plot_fe(self):
+        plt.plot(self.fe_pos, self.fe_sim / self.kT, label = 'PMF from sim.')
+        plt.plot(self.edges, self.fe / self.kT, label = 'PMF from input')
+        plt.ylim(ymax = self.fe_max)
+        plt.ylabel('free energy [kT]')
+        plt.xlabel('x')
+        plt.legend()
+        plt.show()
 
     def integrate_LE(self):
         self.parse_input()
@@ -128,7 +149,9 @@ class Lan_integrator():
                     self.initials, 
                     self.edges, 
                     self.amat)
-                #self.compute_distribution()
+                self.compute_distribution()
+                if self.save:
+                    np.save(self.path_to_save+'traj_'+str(segment), self.x)
         else:
             for segment in range(self.number_segments):
                 self.x, self.initials = Runge_Kutta_integrator_GLE(
@@ -140,5 +163,10 @@ class Lan_integrator():
                     self.initials, 
                     self.edges, 
                     self.amat)
-                #self.compute_distribution()
-        #self.compute_free_energy()
+                self.compute_distribution()
+                if self.save:
+                    np.save(self.path_to_save+'traj_'+str(segment), self.x)
+                    
+        self.compute_free_energy()
+        if self.plot:
+            self.plot_fe()
