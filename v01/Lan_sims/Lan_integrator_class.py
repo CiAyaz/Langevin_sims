@@ -159,8 +159,6 @@ class Lan_integrator():
                 self.compute_distribution()
                 if self.save:
                     np.save(self.path_to_save+'traj_'+str(segment), self.x)
-            if self.save:
-                self.save_fe()
 
         else:
             for segment in range(self.number_segments):
@@ -176,9 +174,9 @@ class Lan_integrator():
                 self.compute_distribution()
                 if self.save:
                     np.save(self.path_to_save + 'traj_'+str(segment), self.x)
-            if self.save:
-                self.save_fe()
 
         self.compute_free_energy()
         if self.plot:
             self.plot_fe()
+        if self.save:
+                self.save_fe()
