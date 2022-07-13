@@ -2,9 +2,6 @@ import numpy as np
 from numba import njit
 from math import sqrt
 
-from pyrsistent import v
-from regex import V0
-
 
 @njit
 def force(x, amatrix, pot_edges, start_bins, width_bins):
@@ -47,9 +44,9 @@ def Runge_Kutta_integrator_GLE(
     number_vars = len(gammas)
     xi_factor = np.zeros(number_vars)
     xi = np.zeros(number_vars)
-    xi_factor[1] = sqrt(2 * kT * gammas[1] / dt)
+    xi_factor[1] = sqrt(2 * kT * gammas[1] * dt)
     for y in range(2, number_vars):
-        xi_factor[y] = sqrt(2 * kT / gammas[y] / dt)
+        xi_factor[y] = sqrt(2 * kT / gammas[y] * dt)
     
     # runge kutta step factors
     RK = np.array([0.5, 0.5, 1.])
@@ -71,32 +68,32 @@ def Runge_Kutta_integrator_GLE(
         xi[1:] = np.random.normal(0., 1., number_vars - 1)
         # first 3 runge kutta steps
         for rk in range(3):
-            k[rk, 0] = vars[rk, 0]
-            k[rk, 1] = (force(vars[rk, 0], amatrix, pot_edges, start_bins, width_bins)
-            - gammas[1] * vars[rk, 1] + xi_factor[1] * xi[1]) / m
+            k[rk, 0] = dt * vars[rk, 1]
+            k[rk, 1] = (dt * (force(vars[rk, 0], amatrix, pot_edges, start_bins, width_bins)
+            - gammas[1] * vars[rk, 1]) + xi_factor[1] * xi[1]) / m
             # orhtogonal degrees of freedom
             for y in range(2, number_vars):
-                k[rk, 1] += coupling_force(vars[rk, 0], vars[rk, y], couplings[y - 2]) / m
-                k[rk, y] = (coupling_force(vars[rk, y], vars[rk, 0], couplings[y - 2]) / gammas[y]
+                k[rk, 1] += dt * coupling_force(vars[rk, 0], vars[rk, y], couplings[y - 2]) / m
+                k[rk, y] = (dt * coupling_force(vars[rk, y], vars[rk, 0], couplings[y - 2]) / gammas[y]
                 + xi_factor[y]*xi[y])
-                vars[rk + 1, y] = vars[0, y] + RK[rk] * dt * k[rk, y]
+                vars[rk + 1, y] = vars[0, y] + RK[rk] * k[rk, y]
             # variable of interest
-            vars[rk + 1, 0] = vars[0, 0] + RK[rk] * dt * k[rk, 0]
-            vars[rk + 1, 1] = vars[0, 1] + RK[rk] * dt * k[rk, 1]
+            vars[rk + 1, 0] = vars[0, 0] + RK[rk] * k[rk, 0]
+            vars[rk + 1, 1] = vars[0, 1] + RK[rk] * k[rk, 1]
 
         # last runge kutta step
-        k[3, 0] = vars[3, 0]
-        k[3, 1] = (force(vars[3, 0], amatrix, pot_edges, start_bins, width_bins)
-        - gammas[1] * vars[3, 1] + xi_factor[1] * xi[1]) / m
+        k[3, 0] = dt * vars[3, 1]
+        k[3, 1] = (dt * (force(vars[3, 0], amatrix, pot_edges, start_bins, width_bins)
+        - gammas[1] * vars[3, 1]) + xi_factor[1] * xi[1]) / m
         # orhtogonal degrees of freedom
         for y in range(2, number_vars):
-            k[3, 1] += coupling_force(vars[3, 0], vars[3, y], couplings[y - 2]) / m
-            k[3, y] = (coupling_force(vars[3, y], vars[3, 0], couplings[y - 2]) / gammas[y]
+            k[3, 1] += dt * coupling_force(vars[3, 0], vars[3, y], couplings[y - 2]) / m
+            k[3, y] = (dt * coupling_force(vars[3, y], vars[3, 0], couplings[y - 2]) / gammas[y]
             + xi_factor[y]*xi[y])
-            vars[0, y] += dt * (k[0, y] + 0.5 * k[1, y] + 0.5 * k[2, y] + k[3, y]) / 6
+            vars[0, y] += (k[0, y] + 2 * k[1, y] + 2 * k[2, y] + k[3, y]) / 6
         # variable of interest
-        vars[0, 0] += dt * (k[0, 0] + 0.5 * k[1, 0] + 0.5 * k[2, 0] + k[3, 0]) / 6
-        vars[0, 1] += dt * (k[0, 1] + 0.5 * k[1, 1] + 0.5 * k[2, 1] + k[3, 1]) / 6
+        vars[0, 0] += (k[0, 0] + 2 * k[1, 0] + 2 * k[2, 0] + k[3, 0]) / 6
+        vars[0, 1] += (k[0, 1] + 2 * k[1, 1] + 2 * k[2, 1] + k[3, 1]) / 6
 
         x[step] = vars[0, 0]
 
@@ -111,7 +108,7 @@ def Runge_Kutta_integrator_LE(
     """
 
     # relevant constants
-    xi_factor = sqrt(2 * kT * gamma / dt)
+    xi_factor = sqrt(2 * kT * gamma * dt)
     
     # runge kutta step factors
     RK = np.array([0.5, 0.5, 1.])
@@ -133,18 +130,18 @@ def Runge_Kutta_integrator_LE(
         xi = np.random.normal(0., 1.)
         # first 3 runge kutta steps
         for rk in range(3):
-            k[rk, 0] = vars[rk, 0]
-            k[rk, 1] = (force(vars[rk, 0], amatrix, pot_edges, start_bins, width_bins)
-            - gamma * vars[rk, 1] + xi_factor * xi) / m
-            vars[rk + 1, 0] = vars[0, 0] + RK[rk] * dt * k[rk, 0]
-            vars[rk + 1, 1] = vars[0, 1] + RK[rk] * dt * k[rk, 1]
+            k[rk, 0] = dt * vars[rk, 1]
+            k[rk, 1] = (dt * (force(vars[rk, 0], amatrix, pot_edges, start_bins, width_bins)
+            - gamma * vars[rk, 1]) + xi_factor * xi) / m
+            vars[rk + 1, 0] = vars[0, 0] + RK[rk] * k[rk, 0]
+            vars[rk + 1, 1] = vars[0, 1] + RK[rk] * k[rk, 1]
 
         # last runge kutta step
-        k[3, 0] = vars[3, 0]
-        k[3, 1] = (force(vars[3, 0], amatrix, pot_edges, start_bins, width_bins)
-        - gamma * vars[3, 1] + xi_factor * xi) / m
-        vars[0, 0] += dt * (k[0, 0] + 0.5 * k[1, 0] + 0.5 * k[2, 0] + k[3, 0]) / 6
-        vars[0, 1] += dt * (k[0, 1] + 0.5 * k[1, 1] + 0.5 * k[2, 1] + k[3, 1]) / 6
+        k[3, 0] = dt * vars[3, 1]
+        k[3, 1] = (dt * (force(vars[3, 0], amatrix, pot_edges, start_bins, width_bins)
+        - gamma * vars[3, 1]) + xi_factor * xi) / m
+        vars[0, 0] += (k[0, 0] + 2 * k[1, 0] + 2 * k[2, 0] + k[3, 0]) / 6
+        vars[0, 1] += (k[0, 1] + 2 * k[1, 1] + 2 * k[2, 1] + k[3, 1]) / 6
 
         x[step] = vars[0, 0]
 
