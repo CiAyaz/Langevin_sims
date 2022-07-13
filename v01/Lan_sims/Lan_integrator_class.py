@@ -135,6 +135,13 @@ class Lan_integrator():
         plt.legend()
         plt.show()
 
+    def save_fe(self):
+        array = np.concatenate(
+            (self.fe_pos.reshape((self.nbins,1)), 
+            self.fe_sim.reshape((self.nbins,1))), 
+            axis = 1)
+        np.save(self.path_to_save + 'traj_fe', array)
+
     def integrate_LE(self):
         self.parse_input()
         self.gen_initial_values()
@@ -152,6 +159,9 @@ class Lan_integrator():
                 self.compute_distribution()
                 if self.save:
                     np.save(self.path_to_save+'traj_'+str(segment), self.x)
+            if self.save:
+                self.save_fe()
+
         else:
             for segment in range(self.number_segments):
                 self.x, self.initials = Runge_Kutta_integrator_GLE(
@@ -165,8 +175,10 @@ class Lan_integrator():
                     self.amat)
                 self.compute_distribution()
                 if self.save:
-                    np.save(self.path_to_save+'traj_'+str(segment), self.x)
-                    
+                    np.save(self.path_to_save + 'traj_'+str(segment), self.x)
+            if self.save:
+                self.save_fe()
+
         self.compute_free_energy()
         if self.plot:
             self.plot_fe()
