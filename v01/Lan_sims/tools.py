@@ -1,6 +1,6 @@
 import numpy as np
 from numba import njit
-from math import sqrt
+from math import sqrt, exp
 
 
 @njit
@@ -169,8 +169,8 @@ def BAOAB(nsteps, dt, m, gamma, initials, pot_edges, amatrix, kT=2.494):
 
     th = 0.5 * dt
     thm = 0.5 * dt / m
-    edt = np.exp(-gammas * dt)
-    sqf = np.sqrt((1.0 - edt ** 2) / (m / kT))
+    edt = exp(-gamma * dt)
+    sqf = sqrt((1.0 - edt ** 2) / (m / kT))
     x = np.zeros(nsteps)
     x[0] = initials[0]
     v = initials[1]
@@ -181,7 +181,7 @@ def BAOAB(nsteps, dt, m, gamma, initials, pot_edges, amatrix, kT=2.494):
         v += thm * f
         x[i + 1] = x[i] + th * v
         v *= edt 
-        v += sqf * np.random.randn(*shape)
+        v += sqf * np.random.randn()
         x[i + 1] = x[i + 1] + th * v
         f = force(x[i + 1], amatrix, pot_edges, start_bins, width_bins)
         v += thm * f
