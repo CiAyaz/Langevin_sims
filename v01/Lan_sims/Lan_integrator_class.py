@@ -27,7 +27,8 @@ class Lan_integrator():
         kT = 2.494,
         plot=True,
         save=False,
-        path_to_save='./'
+        path_to_save='./',
+        single_particle_method="BAOAB"
         ):
         self.dt = dt
         self.segment_len = segment_length
@@ -60,6 +61,7 @@ class Lan_integrator():
         self.plot = plot
         self.save = save
         self.path_to_save = path_to_save
+        self.single_particle_method = single_particle_method
 
     def parse_input(self):
         if not self.single_particle:
@@ -144,18 +146,32 @@ class Lan_integrator():
         self.gen_initial_values()
         self.spline_free_energy()
         if self.single_particle:
-            for segment in range(self.number_segments):
-                self.x, self.initials = Runge_Kutta_integrator_LE(
-                    self.segment_len, 
-                    self.dt, 
-                    self.m, 
-                    self.gammas, 
-                    self.initials, 
-                    self.edges, 
-                    self.amat)
-                self.compute_distribution()
-                if self.save:
-                    np.save(self.path_to_save+'traj_'+str(segment), self.x)
+            if self.single_particle_method == 'RK':
+                for segment in range(self.number_segments):
+                    self.x, self.initials = Runge_Kutta_integrator_LE(
+                        self.segment_len, 
+                        self.dt, 
+                        self.m, 
+                        self.gammas, 
+                        self.initials, 
+                        self.edges, 
+                        self.amat)
+                    self.compute_distribution()
+                    if self.save:
+                        np.save(self.path_to_save+'traj_'+str(segment), self.x)
+            else:
+                for segment in range(self.number_segments):
+                    self.x, self.initials = BAOAB(
+                        self.segment_len, 
+                        self.dt, 
+                        self.m, 
+                        self.gammas, 
+                        self.initials, 
+                        self.edges, 
+                        self.amat)
+                    self.compute_distribution()
+                    if self.save:
+                        np.save(self.path_to_save+'traj_'+str(segment), self.x)
 
         else:
             for segment in range(self.number_segments):

@@ -146,3 +146,44 @@ def Runge_Kutta_integrator_LE(
         x[step] = vars[0, 0]
 
     return x, vars[0]
+
+@njit()
+def BAOAB(nsteps, dt, m, gamma, initials, pot_edges, amatrix, kT=2.494):
+    """Langevin integrator for initial value problems
+    This function implements the BAOAB algorithm of Benedict Leimkuhler
+    and Charles Matthews. See J. Chem. Phys. 138, 174102 (2013) for
+    further details.
+    Arguments:
+        force (function): computes the forces of a single configuration
+        nsteps (int): number of integration steps
+        x_init (numpy.ndarray(n, d)): initial configuration
+        v_init (numpy.ndarray(n, d)): initial velocities
+        m (numpy.ndarray(n)): particle masses
+        dt (float): time step for the integration
+        gammas (float): gammas term, use zero if not coupled
+        kT (float): thermal energy
+    Returns:
+        x (numpy.ndarray(nsteps + 1, n, d)): configuraiton trajectory
+        v (numpy.ndarray(nsteps + 1, n, d)): velocity trajectory
+    """
+
+    th = 0.5 * dt
+    thm = 0.5 * dt / m
+    edt = np.exp(-gammas * dt)
+    sqf = np.sqrt((1.0 - edt ** 2) / (m / kT))
+    x = np.zeros(nsteps)
+    x[0] = initials[0]
+    v = initials[1]
+    start_bins = pot_edges[0]
+    width_bins = pot_edges[1] - pot_edges[0]
+    f = force(x[0], amatrix, pot_edges, start_bins, width_bins)
+    for i in range(nsteps):
+        v += thm * f
+        x[i + 1] = x[i] + th * v
+        v *= edt 
+        v += sqf * np.random.randn(*shape)
+        x[i + 1] = x[i + 1] + th * v
+        f = force(x[i + 1], amatrix, pot_edges, start_bins, width_bins)
+        v += thm * f
+    initials = np.array([x[-1], v])
+    return x, initials
