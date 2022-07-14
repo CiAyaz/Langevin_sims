@@ -112,6 +112,7 @@ class Lan_integrator():
         cs = CubicSpline(self.edges[::self.stride], self.fe[::self.stride], bc_type='not-a-knot')
         self.amat = cs.c.T
 
+
     def compute_distribution(self):
         if self.number_segments == 1:
             self.histogram, self.sim_edges = np.histogram(self.x, bins=self.nbins)
