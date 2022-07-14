@@ -41,10 +41,9 @@ class Lan_integrator():
         else:
             self.fe = free_energy[:,1]
             self.edges = free_energy[:,0]
+        self.hist_range = hist_range
         if self.number_segments > 1:
-            if hist_range != None:
-                self.hist_range = hist_range
-            else:
+            if self.hist_range == None:
                 raise TypeError('hist_range is required for continuation!')
         self.gammas = gammas
         self.couplings = couplings
@@ -73,9 +72,7 @@ class Lan_integrator():
                 else:
                     raise TypeError('Give friction coefficients as scalar, list of scalars or numpy.ndarray!')
         
-            if self.couplings == None:
-                raise TypeError('Coupling coefficients needed!')
-            elif not isinstance(self.couplings, np.ndarray):
+            if not isinstance(self.couplings, np.ndarray):
                 if isinstance(self.couplings, (int, float)):
                     self.couplings = np.array([self.couplings])
                 elif isinstance(self.gammas, list):
