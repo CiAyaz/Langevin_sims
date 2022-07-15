@@ -118,7 +118,7 @@ class Lan_integrator():
             self.histogram, self.sim_edges = np.histogram(self.x, bins=self.nbins)
         else:
             hist_dummy, self.sim_edges = np.histogram(self.x, bins=self.nbins, range=self.hist_range)
-            self.histogram += hist_dummy
+            self.histogram += (hist_dummy / len(self.x))
 
     def compute_free_energy(self):
         self.fe_pos =(self.sim_edges[1:] + self.sim_edges[:-1]) / 2
