@@ -19,7 +19,7 @@ class Lan_integrator():
         dt = 0.01, 
         segment_length = int(1e7), 
         number_segments = 1,
-        m = 1., 
+        mass = 1., 
         stride = 1,
         nbins = 80,
         hist_range = None,
@@ -33,7 +33,7 @@ class Lan_integrator():
         self.dt = dt
         self.segment_len = segment_length
         self.number_segments = number_segments
-        self.m = m
+        self.mass = mass
         self.stride = stride
         self.nbins = nbins
         self.single_particle = single_particle
@@ -100,7 +100,7 @@ class Lan_integrator():
         else: 
             self.initials = np.zeros(len(self.gammas))
         x0 = self.edges[self.fe == np.min(self.fe)]
-        v0 = np.random.normal(0., np.sqrt(self.kT / self.m))
+        v0 = np.random.normal(0., np.sqrt(self.kT / self.mass))
         self.initials[0] = x0
         self.initials[1] = v0
         if not self.single_particle:
@@ -152,7 +152,7 @@ class Lan_integrator():
                     self.x, self.initials = Runge_Kutta_integrator_LE(
                         self.segment_len, 
                         self.dt, 
-                        self.m, 
+                        self.mass, 
                         self.gammas, 
                         self.initials, 
                         self.edges, 
@@ -165,7 +165,7 @@ class Lan_integrator():
                     self.x, self.initials = BAOAB(
                         self.segment_len, 
                         self.dt, 
-                        self.m, 
+                        self.mass, 
                         self.gammas, 
                         self.initials, 
                         self.edges, 
@@ -179,7 +179,7 @@ class Lan_integrator():
                 self.x, self.initials = Runge_Kutta_integrator_GLE(
                     self.segment_len, 
                     self.dt, 
-                    self.m, 
+                    self.mass, 
                     self.gammas, 
                     self.couplings,
                     self.initials, 
