@@ -148,6 +148,7 @@ class Lan_integrator():
         self.spline_free_energy()
         if self.single_particle:
             if self.single_particle_method == 'RK':
+                print('Using runge-kutta integrator')
                 for segment in range(self.number_segments):
                     self.x, self.initials = Runge_Kutta_integrator_LE(
                         self.segment_len, 
@@ -161,6 +162,7 @@ class Lan_integrator():
                     if self.save:
                         np.save(self.path_to_save+'traj_'+str(segment), self.x)
             else:
+                print('Using BAOAB integrator')
                 for segment in range(self.number_segments):
                     self.x, self.initials = BAOAB(
                         self.segment_len, 
