@@ -20,7 +20,8 @@ class Lan_integrator():
         segment_length = int(1e7), 
         number_segments = 1,
         mass = 1., 
-        stride = 1,
+        stride_traj = 1,
+        stride_energy = 1,
         nbins = 80,
         hist_range = None,
         single_particle = True,
@@ -34,7 +35,8 @@ class Lan_integrator():
         self.segment_len = segment_length
         self.number_segments = number_segments
         self.mass = mass
-        self.stride = stride
+        self.stride_traj = stride_traj
+        self.stride_energy = stride_energy
         self.nbins = nbins
         self.single_particle = single_particle
         if free_energy.shape[1] != 2:
@@ -109,7 +111,7 @@ class Lan_integrator():
 
 
     def spline_free_energy(self):
-        cs = CubicSpline(self.edges[::self.stride], self.fe[::self.stride], bc_type='not-a-knot')
+        cs = CubicSpline(self.edges[::self.stride_energy], self.fe[::self.stride_energy], bc_type='not-a-knot')
         self.amat = cs.c.T
 
 
@@ -158,6 +160,7 @@ class Lan_integrator():
                         self.initials, 
                         self.edges, 
                         self.amat)
+                    self.x = self.x[::self.stride_traj]
                     self.compute_distribution()
                     if self.save:
                         np.save(self.path_to_save+'traj_'+str(segment), self.x)
@@ -172,6 +175,7 @@ class Lan_integrator():
                         self.initials, 
                         self.edges, 
                         self.amat)
+                    self.x = self.x[::self.stride_traj]
                     self.compute_distribution()
                     if self.save:
                         np.save(self.path_to_save+'traj_'+str(segment), self.x)
@@ -187,6 +191,7 @@ class Lan_integrator():
                     self.initials, 
                     self.edges, 
                     self.amat)
+                self.x = self.x[::self.stride_traj]
                 self.compute_distribution()
                 if self.save:
                     np.save(self.path_to_save + 'traj_'+str(segment), self.x)
