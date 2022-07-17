@@ -187,3 +187,46 @@ def BAOAB(nsteps, dt, m, gamma, initials, pot_edges, amatrix, kT=2.494):
         v += thm * f
     initials = np.array([x[-1], v])
     return x, initials
+
+@njit()
+def Runge_Kutta_integrator_overdamped_LE(
+    nsteps, dt, gamma, initials, pot_edges, amatrix, kT=2.494):
+    """
+    Integrator for a single particle underdamped Langevin eq.
+    """
+
+    # relevant constants
+    xi_factor = sqrt(2 * kT * dt / gamma)
+    
+    # runge kutta step factors
+    RK = np.array([0.5, 0.5, 1.])
+
+    # arrays to store temp data
+    vars = np.zeros(4)
+    vars[0] = initials
+    k = np.zeros(4)
+    
+    # trajectory array
+    x = np.zeros(nsteps)
+
+    # parameters for spline
+    width_bins = pot_edges[1] - pot_edges[0]
+    start_bins = pot_edges[0]
+
+    for step in range(nsteps):
+        # draw random force
+        xi = np.random.normal(0., 1.)
+        # first 3 runge kutta steps
+        for rk in range(3):
+            k[rk] = (dt * force(vars[rk], amatrix, pot_edges, start_bins, width_bins) / gamma
+             + xi_factor * xi)
+            vars[rk + 1] = vars[0] + RK[rk] * k[rk]
+
+        # last runge kutta step
+        k[3] = (dt * force(vars[3], amatrix, pot_edges, start_bins, width_bins) / gamma
+         + xi_factor * xi)
+        vars[0] += (k[0] + 2 * k[1] + 2 * k[2] + k[3]) / 6
+
+        x[step] = vars[0]
+
+    return x, vars[0]

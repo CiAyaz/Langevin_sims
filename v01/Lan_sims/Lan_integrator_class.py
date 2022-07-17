@@ -201,3 +201,30 @@ class Lan_integrator():
             self.plot_fe()
         if self.save:
                 self.save_fe()
+
+
+
+    def integrate_overdamped_LE(self):
+        self.parse_input()
+        self.gen_initial_values()
+        self.spline_free_energy()
+        print('Integrating overdamped Langevin eq.')
+        print('using 4-th order runge-kutta integrator')
+        for segment in range(self.number_segments):
+            self.x, self.initials[0] = Runge_Kutta_integrator_overdamped_LE(
+                self.segment_len, 
+                self.dt,
+                self.gammas, 
+                self.initials[0], 
+                self.edges, 
+                self.amat)
+            self.x = self.x[::self.stride_traj]
+            self.compute_distribution()
+            if self.save:
+                np.save(self.path_to_save+'traj_'+str(segment), self.x)
+
+        self.compute_free_energy()
+        if self.plot:
+            self.plot_fe()
+        if self.save:
+                self.save_fe()
