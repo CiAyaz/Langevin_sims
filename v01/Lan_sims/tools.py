@@ -31,7 +31,7 @@ def coupling_force(x, y, coupling_k):
 
 @njit()
 def Runge_Kutta_integrator_GLE(
-    nsteps, dt, m, gammas, couplings, initials, pot_edges, amatrix, kT=2.494):
+    nsteps, dt, m, gammas, couplings, initials, pot_edges, amatrix, confinement=True, kT=2.494):
     """
     Integrator for a Markovian Embedding with exponentially
     decaying memory kernels, characterized by friction gamma[i]
@@ -68,8 +68,12 @@ def Runge_Kutta_integrator_GLE(
         xi[1:] = np.random.normal(0., 1., number_vars - 1)
         # first 3 runge kutta steps
         for rk in range(3):
+            if confinement:
+                force_x = force(vars[rk, 0], amatrix, pot_edges, start_bins, width_bins)
+            else:
+                force_x = 0.
             k[rk, 0] = dt * vars[rk, 1]
-            k[rk, 1] = (dt * (force(vars[rk, 0], amatrix, pot_edges, start_bins, width_bins)
+            k[rk, 1] = (dt * ( force_x
             - gammas[1] * vars[rk, 1]) + xi_factor[1] * xi[1]) / m
             # orhtogonal degrees of freedom
             for y in range(2, number_vars):
@@ -82,8 +86,12 @@ def Runge_Kutta_integrator_GLE(
             vars[rk + 1, 1] = vars[0, 1] + RK[rk] * k[rk, 1]
 
         # last runge kutta step
+        if confinement:
+            force_x = force(vars[3, 0], amatrix, pot_edges, start_bins, width_bins)
+        else:
+            force_x = 0.
         k[3, 0] = dt * vars[3, 1]
-        k[3, 1] = (dt * (force(vars[3, 0], amatrix, pot_edges, start_bins, width_bins)
+        k[3, 1] = (dt * (force_x
         - gammas[1] * vars[3, 1]) + xi_factor[1] * xi[1]) / m
         # orhtogonal degrees of freedom
         for y in range(2, number_vars):
@@ -102,7 +110,7 @@ def Runge_Kutta_integrator_GLE(
 
 @njit()
 def Runge_Kutta_integrator_LE(
-    nsteps, dt, m, gamma, initials, pot_edges, amatrix, kT=2.494):
+    nsteps, dt, m, gamma, initials, pot_edges, amatrix, confinement=True, kT=2.494):
     """
     Integrator for a single particle underdamped Langevin eq.
     """
@@ -130,15 +138,23 @@ def Runge_Kutta_integrator_LE(
         xi = np.random.normal(0., 1.)
         # first 3 runge kutta steps
         for rk in range(3):
+            if confinement:
+                force_x = force(vars[rk, 0], amatrix, pot_edges, start_bins, width_bins)
+            else:
+                force_x = 0.
             k[rk, 0] = dt * vars[rk, 1]
-            k[rk, 1] = (dt * (force(vars[rk, 0], amatrix, pot_edges, start_bins, width_bins)
+            k[rk, 1] = (dt * ( force_x
             - gamma * vars[rk, 1]) + xi_factor * xi) / m
             vars[rk + 1, 0] = vars[0, 0] + RK[rk] * k[rk, 0]
             vars[rk + 1, 1] = vars[0, 1] + RK[rk] * k[rk, 1]
 
         # last runge kutta step
+        if confinement:
+            force_x = force(vars[3, 0], amatrix, pot_edges, start_bins, width_bins)
+        else:
+            force_x = 0.
         k[3, 0] = dt * vars[3, 1]
-        k[3, 1] = (dt * (force(vars[3, 0], amatrix, pot_edges, start_bins, width_bins)
+        k[3, 1] = (dt * ( force_x
         - gamma * vars[3, 1]) + xi_factor * xi) / m
         vars[0, 0] += (k[0, 0] + 2 * k[1, 0] + 2 * k[2, 0] + k[3, 0]) / 6
         vars[0, 1] += (k[0, 1] + 2 * k[1, 1] + 2 * k[2, 1] + k[3, 1]) / 6
@@ -148,7 +164,7 @@ def Runge_Kutta_integrator_LE(
     return x, vars[0]
 
 @njit()
-def BAOAB(nsteps, dt, m, gamma, initials, pot_edges, amatrix, kT=2.494):
+def BAOAB(nsteps, dt, m, gamma, initials, pot_edges, amatrix, confinement=True, kT=2.494):
     """Langevin integrator for initial value problems
     This function implements the BAOAB algorithm of Benedict Leimkuhler
     and Charles Matthews. See J. Chem. Phys. 138, 174102 (2013) for
@@ -176,21 +192,27 @@ def BAOAB(nsteps, dt, m, gamma, initials, pot_edges, amatrix, kT=2.494):
     v = initials[1]
     start_bins = pot_edges[0]
     width_bins = pot_edges[1] - pot_edges[0]
-    f = force(x[0], amatrix, pot_edges, start_bins, width_bins)
+    if confinement:
+        f = force(x[0], amatrix, pot_edges, start_bins, width_bins)
+    else:
+        f = 0.
     for i in range(nsteps):
         v += thm * f
         x[i + 1] = x[i] + th * v
         v *= edt 
         v += sqf * np.random.randn()
         x[i + 1] = x[i + 1] + th * v
-        f = force(x[i + 1], amatrix, pot_edges, start_bins, width_bins)
+        if confinement:
+            f = force(x[i + 1], amatrix, pot_edges, start_bins, width_bins)
+        else:
+            f = 0.
         v += thm * f
     initials = np.array([x[-1], v])
     return x, initials
 
 @njit()
 def Runge_Kutta_integrator_overdamped_LE(
-    nsteps, dt, gamma, initials, pot_edges, amatrix, kT=2.494):
+    nsteps, dt, gamma, initials, pot_edges, amatrix, confinement=True, kT=2.494):
     """
     Integrator for a single particle underdamped Langevin eq.
     """
@@ -218,12 +240,20 @@ def Runge_Kutta_integrator_overdamped_LE(
         xi = np.random.normal(0., 1.)
         # first 3 runge kutta steps
         for rk in range(3):
-            k[rk] = (dt * force(vars[rk], amatrix, pot_edges, start_bins, width_bins) / gamma
+            if confinement:
+                force_x = force(vars[rk], amatrix, pot_edges, start_bins, width_bins)
+            else:
+                force_x = 0.
+            k[rk] = (dt * force_x/ gamma
              + xi_factor * xi)
             vars[rk + 1] = vars[0] + RK[rk] * k[rk]
 
         # last runge kutta step
-        k[3] = (dt * force(vars[3], amatrix, pot_edges, start_bins, width_bins) / gamma
+        if confinement:
+            force_x = force(vars[3], amatrix, pot_edges, start_bins, width_bins)
+        else:
+            force_x
+        k[3] = (dt *  force_x/ gamma
          + xi_factor * xi)
         vars[0] += (k[0] + 2 * k[1] + 2 * k[2] + k[3]) / 6
 
