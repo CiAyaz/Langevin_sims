@@ -28,6 +28,7 @@ class Lan_integrator():
         kT = 2.494,
         plot=True,
         save=False,
+        confinement=True,
         path_to_save='./',
         single_particle_method="BAOAB"
         ):
@@ -39,6 +40,7 @@ class Lan_integrator():
         self.stride_energy = stride_energy
         self.nbins = nbins
         self.single_particle = single_particle
+        self.confinement = confinement
         if free_energy.shape[1] != 2:
             raise ShapeError('free energy array must contain two columns (positions, energies)!')
         else:
@@ -89,19 +91,22 @@ class Lan_integrator():
     
             self.gammas = np.append(self.gammas[::-1], np.zeros(1))[::-1]
 
-
-            if isinstance(self.hist_range, (tuple, list)):
-                if isinstance(self.hist_range, list):
-                    self.hist_range = tuple(self.hist_range)
-            else:
-                raise TypeError('hist_range must be list or tuple!')
+            if self.confinement:
+                if isinstance(self.hist_range, (tuple, list)):
+                    if isinstance(self.hist_range, list):
+                        self.hist_range = tuple(self.hist_range)
+                else:
+                    raise TypeError('hist_range must be list or tuple!')
 
     def gen_initial_values(self):
         if self.single_particle:
             self.initials = np.zeros(2)
-        else: 
+        else:
             self.initials = np.zeros(len(self.gammas))
-        x0 = self.edges[self.fe == np.min(self.fe)]
+        if self.confinement:
+            x0 = self.edges[self.fe == np.min(self.fe)]
+        else:
+            x0 = 0.
         v0 = np.random.normal(0., np.sqrt(self.kT / self.mass))
         self.initials[0] = x0
         self.initials[1] = v0
@@ -159,9 +164,11 @@ class Lan_integrator():
                         self.gammas, 
                         self.initials, 
                         self.edges, 
-                        self.amat)
+                        self.amat,
+                        confinement = self.confinement)
                     self.x = self.x[::self.stride_traj]
-                    self.compute_distribution()
+                    if self.confinement:
+                        self.compute_distribution()
                     if self.save:
                         np.save(self.path_to_save+'traj_'+str(segment), self.x)
             else:
@@ -174,9 +181,11 @@ class Lan_integrator():
                         self.gammas, 
                         self.initials, 
                         self.edges, 
-                        self.amat)
+                        self.amat,
+                        confinement = self.confinement)
                     self.x = self.x[::self.stride_traj]
-                    self.compute_distribution()
+                    if self.confinement:
+                        self.compute_distribution()
                     if self.save:
                         np.save(self.path_to_save+'traj_'+str(segment), self.x)
 
@@ -190,17 +199,20 @@ class Lan_integrator():
                     self.couplings,
                     self.initials, 
                     self.edges, 
-                    self.amat)
+                    self.amat,
+                    confinement = self.confinement)
                 self.x = self.x[::self.stride_traj]
-                self.compute_distribution()
+                if self.confinement:
+                    self.compute_distribution()
                 if self.save:
                     np.save(self.path_to_save + 'traj_'+str(segment), self.x)
 
-        self.compute_free_energy()
-        if self.plot:
-            self.plot_fe()
-        if self.save:
-                self.save_fe()
+        if self.confinement:
+            self.compute_free_energy()
+            if self.plot:
+                self.plot_fe()
+            if self.save:
+                    self.save_fe()
 
 
 
